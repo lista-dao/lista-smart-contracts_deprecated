@@ -25,6 +25,7 @@ import "./libraries/AuctionProxy.sol";
 
 
 uint256 constant WAD = 10 ** 18;
+uint256 constant RAY = 10 ** 27;
 uint256 constant RAD = 10 ** 45;
 uint256 constant YEAR = 31864500; //seconds in year (365 * 24.25 * 3600)
 

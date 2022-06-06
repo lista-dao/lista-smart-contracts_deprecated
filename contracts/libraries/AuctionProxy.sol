@@ -13,11 +13,13 @@ import "../ceros/interfaces/IHelioProvider.sol";
 
 import { CollateralType } from  "../ceros/interfaces/IDao.sol";
 
-uint256 constant RAY = 10**27;
 
 library AuctionProxy {
   using SafeERC20 for IERC20;
   using SafeERC20 for GemLike;
+
+  uint256 constant WAD = 10**18;
+  uint256 constant RAY = 10**27;
 
   function startAuction(
     address user,
@@ -29,6 +31,7 @@ library AuctionProxy {
     IHelioProvider helioProvider,
     CollateralType calldata collateral
   ) public returns (uint256 id) {
+    vat.hope(address(usbJoin));
     uint256 usbBal = usb.balanceOf(address(this));
     id = dog.bark(collateral.ilk, user, address(this));
 
@@ -74,8 +77,8 @@ library AuctionProxy {
     uint256 usbBal = hay.balanceOf(address(this));
     uint256 gemBal = collateral.gem.gem().balanceOf(address(this));
 
-    uint256 usbMaxAmount = (maxPrice * collateralAmount) / RAY;
-
+    uint256 usbMaxAmount = (maxPrice * collateralAmount) / WAD;
+    hay.approve(address(hayJoin), usbMaxAmount);
     hay.transferFrom(msg.sender, address(this), usbMaxAmount);
     hayJoin.join(address(this), usbMaxAmount);
 
@@ -86,7 +89,7 @@ library AuctionProxy {
     // dao.dropRewards(address(hay), urn);
 
     uint256 leftover = vat.gem(collateral.ilk, urn); // userGemBalanceBefore
-    ClipperLike(collateral.clip).take(auctionId, collateralAmount, maxPrice, address(this), "");
+    ClipperLike(collateral.clip).take(auctionId, collateralAmount, maxPrice * 10**9, address(this), "");
     leftover = vat.gem(collateral.ilk, urn) - leftover; // leftover
 
     collateral.gem.exit(address(this), vat.gem(collateral.ilk, address(this)));
