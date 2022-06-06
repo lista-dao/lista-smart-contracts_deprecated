@@ -31,7 +31,6 @@ library AuctionProxy {
     IHelioProvider helioProvider,
     CollateralType calldata collateral
   ) public returns (uint256 id) {
-    vat.hope(address(usbJoin));
     uint256 usbBal = usb.balanceOf(address(this));
     id = dog.bark(collateral.ilk, user, address(this));
 
