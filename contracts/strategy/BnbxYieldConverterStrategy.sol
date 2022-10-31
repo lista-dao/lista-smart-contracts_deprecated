@@ -133,7 +133,7 @@ contract BnbxYieldConverterStrategy is BaseStrategy {
 
     /// @dev only owner can change stakeManager address
     /// @param stakeManager new stakeManager address
-    function changeBinancePool(address stakeManager) external onlyOwner {
+    function changeStakeManager(address stakeManager) external onlyOwner {
         require(stakeManager != address(0));
         _bnbxToken.approve(address(_stakeManager), 0);
         _stakeManager = IStakeManager(stakeManager);
@@ -143,7 +143,7 @@ contract BnbxYieldConverterStrategy is BaseStrategy {
 
     /// @dev only owner can change bnbxRouter
     /// @param bnbxRouter new bnbx router address
-    function changeCeRouter(address bnbxRouter) external onlyOwner {
+    function changeBnbxRouter(address bnbxRouter) external onlyOwner {
         require(bnbxRouter != address(0));
         // underlying.approve(address(_bnbxRouter), 0); // Stader commented
         destination = bnbxRouter;
