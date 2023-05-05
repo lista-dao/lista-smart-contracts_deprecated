@@ -13,6 +13,12 @@ interface IBaseStrategy {
     // to withdraw funds from the destination contract
     function withdraw(address recipient, uint256 amount) external returns(uint256);
 
+    // to withdraw token(aNBN/stkBNB/snBNB/BNBx) from the destination contract
+    function withdrawInToken(address recipient, uint256 amount) external returns(uint256);
+
+    //estimate how much token(aNBN/stkBNB/snBNB/BNBx) can get when do withdrawInToken
+    function estimateInToken(uint256 amount) external returns(uint256);
+
     // claim or collect rewards functions
     function harvest() external;
 

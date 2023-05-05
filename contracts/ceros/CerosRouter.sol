@@ -200,6 +200,13 @@ ReentrancyGuardUpgradeable
         emit Withdrawal(msg.sender, recipient, address(_certToken), realAmount);
         return realAmount;
     }
+
+    //estimate how much token(aNBNc) can get when do withdrawInToken
+    function estimateInToken(uint256 amount) external returns(uint256) {
+        uint256 ratio = _certToken.ratio();
+        return (amount * ratio) / 1e18;
+    }
+
     function withdrawFor(address recipient, uint256 amount)
     external
     override

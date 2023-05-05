@@ -99,4 +99,8 @@ interface ICerosRouter {
 
     function getProfitFor(address account) external view returns (uint256);
     function getYieldFor(address account) external view returns(uint256);
+
+    //estimate how much token(aNBNc) can get when do withdrawInToken
+    function estimateInToken(uint256 amount) external returns(uint256);
+
 }

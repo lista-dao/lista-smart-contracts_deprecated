@@ -84,6 +84,23 @@ contract CerosYieldConverterStrategy is BaseStrategy {
         }
     }
 
+    // withdrawal aBNBc
+    /// @param recipient address to receive withdrawan aBNBc
+    /// @param amount in BNB
+    function withdrawInToken(address recipient, uint256 amount)
+    external
+    override
+    nonReentrant
+    returns (uint256 realAmount)
+    {
+        return _ceRouter.withdrawABNBc(recipient, amount);
+    }
+
+    //estimate how much token(aBNBc) can get when do withdrawInToken
+    function estimateInToken(uint256 amount) external returns(uint256){
+        return _ceRouter.estimateInToken(amount);
+    }
+
     function canDeposit(uint256 amount) public view returns(bool) {
         uint256 minimumStake = IBinancePool(_binancePool).getMinimumStake();
         uint256 relayerFee = _binancePool.getRelayerFee();
