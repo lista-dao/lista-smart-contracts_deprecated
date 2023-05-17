@@ -22,7 +22,7 @@ ReentrancyGuardUpgradeable
      */
     IVault private _vault;
     IDex private _dex;
-    IBinancePool private _binancePool; // default (BinancePool)
+    IBinancePool private _pool; // default (BinancePool)
     // Tokens
     ICertToken private _certToken; // (default aBNBc)
     address private _wBnbAddress;
@@ -57,7 +57,7 @@ ReentrancyGuardUpgradeable
         _ceToken = IERC20(ceToken);
         _vault = IVault(vault);
         _dex = IDex(dexAddress);
-        _binancePool = IBinancePool(pool);
+        _pool = IBinancePool(pool);
         IERC20(wBnbToken).approve(dexAddress, type(uint256).max);
         IERC20(certToken).approve(dexAddress, type(uint256).max);
         IERC20(certToken).approve(bondToken, type(uint256).max);
@@ -75,33 +75,31 @@ ReentrancyGuardUpgradeable
     returns (uint256 value)
     {
         uint256 amount = msg.value;
-        // // get returned amount from Dex
+        // get returned amount from Dex
         // address[] memory path = new address[](2);
         // path[0] = _wBnbAddress;
         // path[1] = address(_certToken);
         // uint256[] memory outAmounts = _dex.getAmountsOut(amount, path);
         // uint256 dexABNBcAmount = outAmounts[outAmounts.length - 1];
         // // let's calculate returned amount of aBNBc from BinancePool
+        // // poolABNBcAmount = amount - relayerFee - amount*(1-ratio);
         uint256 minimumStake = _bnbStakingPool.getMinStake();
-        uint256 relayerFee = /*_binancePool.getRelayerFee()*/0;
-        uint256 ratio = _certToken.ratio();
-        uint256 poolABNBcAmount;
-        if (amount >= minimumStake + relayerFee) {
-            poolABNBcAmount = ((amount - relayerFee) * ratio) / 1e18;
+        uint256 shares;
+        if (amount >= minimumStake) {
+            shares = _certToken.bondsToShares(amount);
         }
         // compare poolABNBcAmount with dexABNBcAmount from Dex
         // if poolABNBcAmount >= dexABNBcAmount -> stake via BinancePool
         // else -> swap on Dex
         uint256 realAmount;
         uint256 profit;
-        if (poolABNBcAmount >= 0) {//TODO
-            realAmount = poolABNBcAmount;
-            // _binancePool.stakeAndClaimCerts{value: amount}();
+        if (shares >= 0) {
+            realAmount = shares;
             _bnbStakingPool.stakeCerts{value: amount}();
         } else {
-            revert("DEX PATH");
+            revert("DEX DISABLED");
             // uint256[] memory amounts = _dex.swapExactETHForTokens{
-            // value: amount
+            //     value: amount
             // }(dexABNBcAmount, path, address(this), block.timestamp + 300);
             // realAmount = amounts[1];
             // if (realAmount > poolABNBcAmount && poolABNBcAmount != 0) {
@@ -114,6 +112,7 @@ ReentrancyGuardUpgradeable
             "insufficient amount of CerosRouter in cert token"
         );
         // add profit
+        // TODO profit is 0
         _profits[msg.sender] += profit;
         value = _vault.depositFor(msg.sender, realAmount - profit);
         emit Deposit(msg.sender, _wBnbAddress, realAmount - profit, profit);
@@ -183,11 +182,11 @@ ReentrancyGuardUpgradeable
     returns (uint256 realAmount)
     {
         require(
-            amount >= _binancePool.getMinimumStake(),
+            amount >= _pool.getMinimumStake(),
             "value must be greater than min unstake amount"
         );
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
-        _binancePool.unstakeCertsFor(recipient, realAmount);
+        _pool.unstakeCertsFor(recipient, realAmount);
         emit Withdrawal(msg.sender, recipient, _wBnbAddress, amount);
         return realAmount;
     }
@@ -212,7 +211,7 @@ ReentrancyGuardUpgradeable
     returns (uint256 realAmount)
     {
         realAmount = _vault.withdrawFor(msg.sender, address(this), amount);
-        _binancePool.unstakeCertsFor(recipient, realAmount); // realAmount -> BNB
+        _pool.unstakeCertsFor(recipient, realAmount); // realAmount -> BNB
         emit Withdrawal(msg.sender, recipient, _wBnbAddress, realAmount);
         return realAmount;
     }
@@ -244,7 +243,7 @@ ReentrancyGuardUpgradeable
     view
     returns (uint256)
     {
-        return _binancePool.pendingUnstakesOf(account);
+        return _pool.pendingUnstakesOf(account);
     }
     function changeVault(address vault) external onlyOwner {
         // update allowances
@@ -264,9 +263,9 @@ ReentrancyGuardUpgradeable
     }
     function changePool(address pool) external onlyOwner {
         // update allowances
-        _certToken.approve(address(_binancePool), 0);
-        _binancePool = IBinancePool(pool);
-        _certToken.approve(address(_binancePool), type(uint256).max);
+        _certToken.approve(address(_pool), 0);
+        _pool = IBinancePool(pool);
+        _certToken.approve(address(_pool), type(uint256).max);
         emit ChangePool(pool);
     }
     function changeProvider(address provider) external onlyOwner {
@@ -274,18 +273,12 @@ ReentrancyGuardUpgradeable
         emit ChangeProvider(provider);
     }
     function changeBNBStakingPool(address pool) external onlyOwner {
+        if (address(_bnbStakingPool) != address(0))
+            _certToken.approve(address(_bnbStakingPool), 0);
+
         _bnbStakingPool = IBNBStakingPool(pool);
-    }
-    function changeCertToken(address certToken) external onlyOwner {
-        // update allowances
-        _certToken.approve(address(_binancePool), 0);
-        _certToken.approve(address(_dex), 0);
-        _certToken.approve(address(_vault), 0);
-        _certToken = ICertToken(certToken);
-        _certToken.approve(address(_binancePool), type(uint256).max);
-        _certToken.approve(address(_dex), type(uint256).max);
-        _certToken.approve(address(_vault), type(uint256).max);
-        emit ChangeCertToken(certToken);
+        _certToken.approve(address(_bnbStakingPool), type(uint256).max);
+        emit ChangeBNBStakingPool(pool);
     }
     function getProvider() external view returns(address) {
         return _provider;
@@ -300,7 +293,7 @@ ReentrancyGuardUpgradeable
         return address(_certToken);
     }
     function getPoolAddress() external view returns(address) {
-        return address(_binancePool);
+        return address(_pool);
     }
     function getDexAddress() external view returns(address) {
         return address(_dex);

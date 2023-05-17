@@ -27,7 +27,7 @@ ReentrancyGuardUpgradeable
     ICertToken public _collateralToken; // (default hBNB)
     ICerosRouter public _ceRouter;
     IDao public _dao;
-    IBinancePool public _pool;
+    IBinancePool public _pool; // OLD POOL(BinancePool)
     address public _proxy;
     
     /**
