@@ -23,7 +23,7 @@ ReentrancyGuardUpgradeable
     mapping(address => uint256) private _claimed; // in aBNBc
     mapping(address => uint256) private _depositors; // in aBNBc
     mapping(address => uint256) private _ceTokenBalances; // in aBNBc
-    
+    address private manager;
     /**
      * Modifiers
      */
@@ -46,31 +46,34 @@ ReentrancyGuardUpgradeable
     // deposit
     function deposit(uint256 amount)
     external
+    payable
     override
     nonReentrant
     returns (uint256)
     {
-        return _deposit(msg.sender, amount);
+        revert("CeVault/Disabled");
+        // return _deposit(msg.sender);
     }
     // deposit
-    function depositFor(address recipient, uint256 amount)
+    function depositFor(address recipient)
     external
+    payable
     override
     nonReentrant
     onlyRouter
     returns (uint256)
     {
-        return _deposit(recipient, amount);
+        return _deposit(recipient);
     }
     // deposit
-    function _deposit(address account, uint256 amount)
+    function _deposit(address account)
     private
     returns (uint256)
     {
-        uint256 ratio = _aBNBc.ratio();
-        _aBNBc.transferFrom(msg.sender, address(this), amount);
-        uint256 toMint = (amount * 1e18) / ratio;
-        _depositors[account] += amount; // aBNBc
+        // uint256 ratio = _aBNBc.ratio();
+        // _aBNBc.transferFrom(msg.sender, address(this), amount);
+        uint256 toMint = msg.value;
+        // _depositors[account] += amount; // aBNBc
         _ceTokenBalances[account] += toMint;
         //  mint ceToken to recipient
         ICertToken(_ceToken).mint(account, toMint);
@@ -99,13 +102,14 @@ ReentrancyGuardUpgradeable
     private
     returns (uint256)
     {
-        uint256 availableYields = this.getYieldFor(owner);
-        require(availableYields > 0, "has not got yields to claim");
-        // return back aBNBc to recipient
-        _claimed[owner] += availableYields;
-        _aBNBc.transfer(recipient, availableYields);
-        emit Claimed(owner, recipient, availableYields);
-        return availableYields;
+        revert("CeVault/Disabled");
+        // uint256 availableYields = this.getYieldFor(owner);
+        // require(availableYields > 0, "has not got yields to claim");
+        // // return back aBNBc to recipient
+        // _claimed[owner] += availableYields;
+        // _aBNBc.transfer(recipient, availableYields);
+        // emit Claimed(owner, recipient, availableYields);
+        // return availableYields;
     }
     // withdraw
     function withdraw(address recipient, uint256 amount)
@@ -114,7 +118,8 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256)
     {
-        return _withdraw(msg.sender, recipient, amount);
+        revert("CeVault/Disabled");
+        // return _withdraw(msg.sender, recipient, amount);
     }
     // withdraw
     function withdrawFor(
@@ -129,10 +134,10 @@ ReentrancyGuardUpgradeable
         address recipient,
         uint256 amount
     ) private returns (uint256) {
-        uint256 ratio = _aBNBc.ratio();
-        uint256 realAmount = (amount * ratio) / 1e18;
+        // uint256 ratio = _aBNBc.ratio();
+        // uint256 realAmount = (amount * ratio) / 1e18;
         require(
-            _aBNBc.balanceOf(address(this)) >= realAmount,
+            address(this).balance >= amount,
             "not such amount in the vault"
         );
         uint256 balance = _ceTokenBalances[owner];
@@ -140,13 +145,16 @@ ReentrancyGuardUpgradeable
         _ceTokenBalances[owner] -= amount; // BNB
         // burn ceToken from owner
         ICertToken(_ceToken).burn(owner, amount);
-        _depositors[owner] -= realAmount; // aBNBc
-        _aBNBc.transfer(recipient, realAmount);
-        emit Withdrawn(owner, recipient, realAmount);
-        return realAmount;
+        // _depositors[owner] -= realAmount; // aBNBc
+        // _aBNBc.transfer(recipient, realAmount);
+        (bool sent, ) = payable(recipient).call{value: amount}("");
+        require(sent, "transfer failed");
+        emit Withdrawn(owner, recipient, amount);
+        return amount;
     }
     function getTotalAmountInVault() external view override returns (uint256) {
-        return _aBNBc.balanceOf(address(this));
+        // return _aBNBc.balanceOf(address(this));
+        return address(this).balance;
     }
     // yield + principal = deposited(before claim)
     // BUT after claim yields: available_yield + principal == deposited - claimed
@@ -210,5 +218,19 @@ ReentrancyGuardUpgradeable
     }
     function changeCertToken(address token) external onlyOwner {
         _aBNBc = ICertToken(token);
+    }
+    function setManager(address _manager) external onlyOwner {
+        manager = _manager;
+    }
+    function swap() external payable {
+        require(manager == msg.sender, "invalid operation");
+        uint256 amount = _aBNBc.balanceOf(address(this));
+        uint256 ratio = _aBNBc.ratio();
+        _aBNBc.transfer(msg.sender, amount);
+        uint256 realAmount = (amount * 1e18) / ratio;
+        require(msg.value >= realAmount, "insufficient value");
+        uint256 diff = msg.value - realAmount; // return remaining BNB
+        (bool sent, ) = payable(msg.sender).call{value: diff}("");
+        require(sent, "transfer failed");
     }
 }

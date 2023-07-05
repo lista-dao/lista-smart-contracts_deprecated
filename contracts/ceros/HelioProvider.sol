@@ -139,10 +139,11 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
-        _withdrawCollateral(msg.sender, amount);
-        value = _ceRouter.withdrawABNBc(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, value);
-        return value;
+        revert("HelioProvider/Disabled");
+        // _withdrawCollateral(msg.sender, amount);
+        // value = _ceRouter.withdrawABNBc(recipient, amount);
+        // emit Withdrawal(msg.sender, recipient, value);
+        // return value;
     }
     /**
      * DAO FUNCTIONALITY
@@ -153,7 +154,7 @@ ReentrancyGuardUpgradeable
     onlyProxy
     nonReentrant
     {
-        _ceRouter.withdrawABNBc(recipient, amount);
+        _ceRouter.withdrawFor(recipient, amount);
     }
     function daoBurn(address account, uint256 value)
     external

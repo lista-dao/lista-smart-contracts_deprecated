@@ -71,6 +71,8 @@ interface ICerosRouter {
     // claim in aBNBc
     function claim(address recipient) external returns (uint256);
 
+    function claimProfit(address recipient) external;
+
     /**
      * Withdrawal
      */
@@ -96,4 +98,7 @@ interface ICerosRouter {
     function withdrawABNBc(address recipient, uint256 amount)
     external
     returns (uint256);
+
+    function getProfitFor(address account) external view returns (uint256);
+    function getYieldFor(address account) external view returns(uint256);
 }
