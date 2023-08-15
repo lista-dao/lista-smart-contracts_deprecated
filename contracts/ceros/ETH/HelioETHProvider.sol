@@ -4,10 +4,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IDao.sol";
 import "../interfaces/ICerosETHRouter.sol";
 import "../interfaces/IHelioETHProvider.sol";
-import "../interfaces/IBinancePool.sol";
 import "../interfaces/ICertToken.sol";
 
 contract HelioETHProvider is
@@ -27,7 +27,8 @@ ReentrancyGuardUpgradeable
     ICerosETHRouter public _ceETHRouter;
     IDao public _dao;
     address public _proxy;
-    
+    uint256 _minWithdrawalAmount;
+    using SafeERC20 for IERC20;
     /**
      * Modifiers
      */
@@ -51,7 +52,7 @@ ReentrancyGuardUpgradeable
         address ceToken,
         address ceRouter,
         address daoAddress,
-        address pool
+        uint256 minAmount
     ) public initializer {
         __Ownable_init();
         __Pausable_init();
@@ -62,8 +63,9 @@ ReentrancyGuardUpgradeable
         _ceToken = ceToken;
         _ceETHRouter = ICerosETHRouter(ceRouter);
         _dao = IDao(daoAddress);
-        IERC20(_ceToken).approve(daoAddress, type(uint256).max);
-        IERC20(_certToken).approve(ceRouter, type(uint256).max);
+        _minWithdrawalAmount = minAmount;
+        IERC20(_ceToken).safeApprove(daoAddress, type(uint256).max);
+        IERC20(_certToken).safeApprove(ceRouter, type(uint256).max);
     }
     /**
      * DEPOSIT
@@ -75,7 +77,7 @@ ReentrancyGuardUpgradeable
     nonReentrant
     returns (uint256 value)
     {
-        IERC20(_certToken).transferFrom(msg.sender, address(this), amount);
+        IERC20(_certToken).safeTransferFrom(msg.sender, address(this), amount);
         value = _ceETHRouter.deposit(amount);
         // deposit ceToken as collateral
         _provideCollateral(msg.sender, value);
@@ -104,23 +106,27 @@ ReentrancyGuardUpgradeable
     function releaseInBETH(address recipient, uint256 amount)
     external
     override
+    whenNotPaused
     nonReentrant
     returns (uint256 value)
     {
+        require(amount >= _minWithdrawalAmount, "Too small withdrawal amount");
         _withdrawCollateral(msg.sender, amount);
         value = _ceETHRouter.withdrawBETH(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, amount);
+        emit Withdrawal(msg.sender, recipient, value);
         return value;
     }
     function releaseInETH(address recipient, uint256 amount)
     external
     override
+    whenNotPaused
     nonReentrant
     returns (uint256 value)
     {
+        require(amount >= _minWithdrawalAmount, "Too small withdrawal amount");
         _withdrawCollateral(msg.sender, amount);
         value = _ceETHRouter.withdrawETH(recipient, amount);
-        emit Withdrawal(msg.sender, recipient, amount);
+        emit Withdrawal(msg.sender, recipient, value);
         return value;
     }
     /**
@@ -175,15 +181,15 @@ ReentrancyGuardUpgradeable
      * UPDATING FUNCTIONALITY
      */
     function changeDao(address dao) external onlyOwner {
-        IERC20(_ceToken).approve(address(_dao), 0);
+        IERC20(_ceToken).safeApprove(address(_dao), 0);
         _dao = IDao(dao);
-        IERC20(_ceToken).approve(address(_dao), type(uint256).max);
+        IERC20(_ceToken).safeApprove(address(_dao), type(uint256).max);
         emit ChangeDao(dao);
     }
     function changeCeToken(address ceToken) external onlyOwner {
-        IERC20(_ceToken).approve(address(_dao), 0);
+        IERC20(_ceToken).safeApprove(address(_dao), 0);
         _ceToken = ceToken;
-        IERC20(_ceToken).approve(address(_dao), type(uint256).max);
+        IERC20(_ceToken).safeApprove(address(_dao), type(uint256).max);
         emit ChangeCeToken(ceToken);
     }
     function changeProxy(address auctionProxy) external onlyOwner {
@@ -201,5 +207,9 @@ ReentrancyGuardUpgradeable
     function changeCertToken(address token) external onlyOwner {
         _certToken = token;
         emit ChangeCertToken(token);
+    }
+    function changeMinWithdrwalAmount(uint256 amount) external onlyOwner {
+        _minWithdrawalAmount = amount;
+        emit ChangeWithdrwalAmount(amount);
     }
 }

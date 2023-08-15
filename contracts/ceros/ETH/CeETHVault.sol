@@ -42,17 +42,21 @@ ReentrancyGuardUpgradeable
     }
     function initialize(
         string memory name,
+        address certToken,
         address ceTokenAddress,
         address wBETHAddress,
-        uint256 withdrawalFee
+        uint256 withdrawalFee,
+        address strategist
     ) external initializer {
         __Ownable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
         _name = name;
+        _certToken = ICertToken(certToken);
         _ceToken = ICertToken(ceTokenAddress);
         _BETH = IBETH(wBETHAddress);
         _withdrawalFee = withdrawalFee;
+        _strategist = strategist;
     }
     // deposit
     function depositFor(address recipient, uint256 certTokenAmount, uint256 wBETHAmount)

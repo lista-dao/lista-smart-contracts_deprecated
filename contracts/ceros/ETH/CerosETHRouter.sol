@@ -4,11 +4,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IETHVault.sol";
-import "../interfaces/IDex.sol";
 import "../interfaces/ICerosETHRouter.sol";
-import "../interfaces/IBinancePool.sol";
-import "../interfaces/IBNBStakingPool.sol";
 import "../interfaces/ICertToken.sol";
 import "../interfaces/IBETH.sol";
 
@@ -29,7 +27,8 @@ ReentrancyGuardUpgradeable
     address private _provider;
     address private _referral;
     uint256 private _minStake;
-    uint256 private _certTokenRatio; // 80% BETH, 20% ETH
+    uint256 private _certTokenRatio; // 20% ETH, wBETH
+    using SafeERC20 for IERC20;
     /**
      * Modifiers
      */
@@ -59,9 +58,9 @@ ReentrancyGuardUpgradeable
         _referral = referral;
         _certTokenRatio = certTokenRatio;
         _BETH = IBETH(BETH);
-        IERC20(certToken).approve(vault, type(uint256).max);
-        IERC20(certToken).approve(vault, type(uint256).max);
-        IERC20(BETH).approve(vault, type(uint256).max);
+        IERC20(certToken).safeApprove(vault, type(uint256).max);
+        IERC20(certToken).safeApprove(BETH, type(uint256).max);
+        IERC20(BETH).safeApprove(vault, type(uint256).max);
     }
     /**
      * DEPOSIT
@@ -74,7 +73,7 @@ ReentrancyGuardUpgradeable
     returns (uint256 value)
     {
         require(amount >= _minStake, "amount must be greater than minStake");
-
+        IERC20(_certToken).safeTransferFrom(msg.sender, address(this), amount);
         // keep the ratio as 80%
         uint256 ceTokenPreBalance = _vault.getCeTokenBalanceOf(address(this));
         uint256 certTokenAmountBalance = _certToken.balanceOf(address(_vault));
@@ -84,7 +83,10 @@ ReentrancyGuardUpgradeable
             certTokenAmount = ceTokenPostBalance * _certTokenRatio / 1e18 - certTokenAmountBalance;
         }
         uint256 BETHAmount = (amount - certTokenAmount) * 1e18 / _BETH.exchangeRate();
+        // uint256 prevBalance = IERC20(_BETH).balanceOf(address(this));
         _BETH.deposit(amount - certTokenAmount, _referral);
+        // uint256 afterBalance = IERC20(_BETH).balanceOf(address(this));
+        // uint256 BETHAmount = afterBalance - prevBalance;
         value = _vault.depositFor(msg.sender, certTokenAmount, BETHAmount);
 
         emit Deposit(msg.sender, certTokenAmount, BETHAmount);
@@ -93,7 +95,7 @@ ReentrancyGuardUpgradeable
     /**
      * CLAIM
      */
-    // claim yields in aBNBc
+    // claim yields in wBETH and ETH
     function claim(address recipient)
     external
     override
@@ -107,9 +109,9 @@ ReentrancyGuardUpgradeable
     /**
      * WITHDRAWAL
      */
-    // withdrawal aBNBc
-    /// @param recipient address to receive withdrawan aBNBc
-    /// @param amount in BNB
+    // withdrawal ETH
+    /// @param recipient address to receive withdrawan ETH
+    /// @param amount in ETH
     function withdrawETH(address recipient, uint256 amount)
     external
     override
@@ -146,6 +148,7 @@ ReentrancyGuardUpgradeable
             return;
         }
         uint256 diff = amount - totalETHAmount;
+        _vault.withdrawETHFor(msg.sender, recipient, amount);
         _vault.withdrawBETHFor(msg.sender, recipient, diff);
     }
     function changeVault(address vault) external onlyOwner {
@@ -164,6 +167,7 @@ ReentrancyGuardUpgradeable
         emit ChangeMinStakeAmount(minStake);
     }
     function changeCertTokenRatio(uint256 ratio) external onlyOwner {
+        require(ratio >= 0 && ratio <= 1e18, "invalid cert token ratio");
         _certTokenRatio = ratio;
         emit ChangeCertTokenRatio(ratio);
     }

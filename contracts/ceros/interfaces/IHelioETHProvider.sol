@@ -28,6 +28,8 @@ interface IHelioETHProvider {
 
     event ChangeCertToken(address token);
 
+    event ChangeWithdrwalAmount(uint256 amount);
+
     /**
      * Deposit
      */
